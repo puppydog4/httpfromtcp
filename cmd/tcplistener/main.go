@@ -1,4 +1,4 @@
-package tcplistener
+package main
 
 import (
 	"errors"
@@ -11,7 +11,7 @@ import (
 
 const port = ":8080"
 
-func tcplistener() {
+func main() {
 	listener, err := net.Listen("tcp", port)
 	if err != nil {
 		log.Fatal(err)
@@ -35,16 +35,17 @@ func tcplistener() {
 func getLinesChannel(f io.ReadCloser) <-chan string {
 
 	currentLineChannel := make(chan string)
-	currentLine := ""
+
 	go func() {
+		defer f.Close()
 		defer close(currentLineChannel)
+		currentLine := ""
 		for {
 			data := make([]byte, 8)
 			count, err := f.Read(data)
 			if err != nil {
 				if currentLine != "" {
-					fmt.Printf("read: %s\n", currentLine)
-					currentLine = ""
+					currentLineChannel <- currentLine
 				}
 				if errors.Is(err, io.EOF) {
 					break
@@ -53,10 +54,9 @@ func getLinesChannel(f io.ReadCloser) <-chan string {
 			dataString := string(data[:count])
 			parts := strings.Split(dataString, "\n")
 
-			currentLineChannel <- parts[0]
 			currentLine += parts[0]
 			if len(parts) > 1 {
-				currentLineChannel <- parts[1]
+				currentLineChannel <- currentLine
 				currentLine = parts[1]
 			}
 		}
